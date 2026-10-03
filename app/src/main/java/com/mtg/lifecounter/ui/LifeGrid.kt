@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,6 +32,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -63,6 +65,9 @@ private const val PAGE_SIZE = COLS * ROWS
 /** Number of cell rows drawn in Field.png; only the top [ROWS] of them are shown. */
 private const val FIELD_IMAGE_ROWS = 10
 
+/** Corner radius of the field relative to the cell width. */
+private const val FIELD_CORNER_RATIO = 0.15f
+
 @Composable
 fun LifeGrid(
     lifeBase: Int,
@@ -71,6 +76,7 @@ fun LifeGrid(
     onLifeSelected: (Int) -> Unit,
     onScrollPage: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    marbleKey: Any? = null,
     marbleModifier: Modifier = Modifier
 ) {
     var dragAccumulator by remember { mutableFloatStateOf(0f) }
@@ -107,7 +113,9 @@ fun LifeGrid(
             painter = fieldPainter,
             contentDescription = null,
             contentScale = ContentScale.FillBounds,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(cellW * FIELD_CORNER_RATIO))
         )
 
         // Number labels
@@ -164,15 +172,16 @@ fun LifeGrid(
             val gridHPx = constraints.maxHeight.toFloat()
             val target = Offset(cellWPx * (selectedCol + 0.5f), cellHPx * (selectedRow + 0.5f))
 
-            // Marble center in grid pixels; follows the finger while dragged, springs to a cell otherwise
-            val marbleCenter = remember { Animatable(target, Offset.VectorConverter) }
-            var dragCenter by remember { mutableStateOf<Offset?>(null) }
+            // Marble center in grid pixels; follows the finger while dragged, springs to a cell otherwise.
+            // A new marbleKey places the marble at its cell without sliding.
+            val marbleCenter = remember(marbleKey) { Animatable(target, Offset.VectorConverter) }
+            var dragCenter by remember(marbleKey) { mutableStateOf<Offset?>(null) }
             val isDragging = dragCenter != null
             val scope = rememberCoroutineScope()
             val currentOnLifeSelected by rememberUpdatedState(onLifeSelected)
             val currentLifeBase by rememberUpdatedState(lifeBase)
 
-            LaunchedEffect(target, isDragging) {
+            LaunchedEffect(marbleCenter, target, isDragging) {
                 if (!isDragging) {
                     marbleCenter.animateTo(target, spring(dampingRatio = 0.7f, stiffness = 300f))
                 }
@@ -193,7 +202,7 @@ fun LifeGrid(
                     }
                     .size(marbleSize)
                     .then(marbleModifier)
-                    .pointerInput(cellWPx, cellHPx) {
+                    .pointerInput(cellWPx, cellHPx, marbleCenter) {
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
                             down.consume()

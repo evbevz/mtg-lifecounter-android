@@ -1,6 +1,9 @@
 package com.mtg.lifecounter.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
@@ -17,16 +20,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.GraphicsLayerScope
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -59,6 +68,17 @@ private const val DICE_SIZE_RATIO = 80f / 768f
 private const val DICE_RIGHT_OFFSET = 60f / 768f
 
 private const val IDLE_TIMEOUT_MS = 60_000L
+
+/** Player switch timings; the flip matches CARD_ROTATE_DURATION of the iOS version. */
+private const val MARBLE_FADE_MS = 200
+private const val CARD_FLIP_MS = 400
+
+/** Marbles fade and shrink together: 0 is hidden at zero size, 1 is fully visible at original size. */
+private fun GraphicsLayerScope.marbleAppearance(progress: Float) {
+    alpha = progress
+    scaleX = progress
+    scaleY = progress
+}
 
 @Composable
 fun GameScreen(
@@ -93,6 +113,27 @@ fun GameScreen(
 
     LaunchedEffect(dice, showIdleScreen) {
         dice?.setDiceVisible(!showIdleScreen)
+    }
+
+    // Player whose card is on screen; lags behind activeIndex while the switch animation runs
+    var shownIndex by remember { mutableIntStateOf(activeIndex) }
+    val shownPlayer = viewModel.players[shownIndex]
+    val marblesAlpha = remember { Animatable(1f) }
+    val cardRotation = remember { Animatable(0f) }
+    var isSwitching by remember { mutableStateOf(false) }
+
+    LaunchedEffect(activeIndex) {
+        if (activeIndex == shownIndex) return@LaunchedEffect
+        isSwitching = true
+        marblesAlpha.animateTo(0f, tween(MARBLE_FADE_MS))
+        cardRotation.animateTo(90f, tween(CARD_FLIP_MS / 2, easing = LinearEasing))
+        shownIndex = activeIndex
+        cardRotation.snapTo(-90f)
+        // Let the new player's card compose before timing the second half, so it isn't skipped
+        withFrameNanos { }
+        cardRotation.animateTo(0f, tween(CARD_FLIP_MS / 2, easing = LinearEasing))
+        marblesAlpha.animateTo(1f, tween(MARBLE_FADE_MS))
+        isSwitching = false
     }
 
     Box(modifier = modifier.background(Color.Black)) {
@@ -141,18 +182,26 @@ fun GameScreen(
                 val cardW = gameW * CARD_W
                 val cardH = gameH * CARD_H
 
-                val marbleRes = if (activeIndex == 0) R.drawable.marble_blue else R.drawable.marble_red
+                val marbleRes = if (shownIndex == 0) R.drawable.marble_blue else R.drawable.marble_red
+                val density = LocalDensity.current.density
 
                 LifeGrid(
-                    lifeBase = activePlayer.lifeBase,
-                    currentLife = activePlayer.life,
+                    lifeBase = shownPlayer.lifeBase,
+                    currentLife = shownPlayer.life,
                     marbleRes = marbleRes,
                     onLifeSelected = { viewModel.setLife(it) },
                     onScrollPage = { viewModel.scrollLifeBase(it) },
                     modifier = Modifier
                         .offset(x = cardX, y = cardY)
-                        .size(width = cardW, height = cardH),
-                    marbleModifier = Modifier.diceObstacle(obstacles, "active")
+                        .size(width = cardW, height = cardH)
+                        .graphicsLayer {
+                            rotationY = cardRotation.value
+                            cameraDistance = 12f * density
+                        },
+                    marbleKey = shownIndex,
+                    marbleModifier = Modifier
+                        .diceObstacle(obstacles, "active")
+                        .graphicsLayer { marbleAppearance(marblesAlpha.value) }
                 )
 
                 // --- Poison thermometer (left side) ---
@@ -190,13 +239,14 @@ fun GameScreen(
                             .size(bubbleSize)
                     )
 
-                    if (i != activeIndex) {
+                    if (i != shownIndex) {
                         // Inactive player: show marble button with life total
                         Box(
                             modifier = Modifier
                                 .offset(x = btnX, y = btnY)
                                 .size(marbleSize)
                                 .diceObstacle(obstacles, "player$i")
+                                .graphicsLayer { marbleAppearance(marblesAlpha.value) }
                                 .clickable {
                                     dice?.returnToDefaultPlace()
                                     viewModel.switchPlayer(i)
@@ -241,6 +291,21 @@ fun GameScreen(
                             )
                         }
                 )
+
+                // Touches are ignored until the player switch animation finishes
+                if (isSwitching) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                awaitPointerEventScope {
+                                    while (true) {
+                                        awaitPointerEvent().changes.forEach { it.consume() }
+                                    }
+                                }
+                            }
+                    )
+                }
             }
         }
 
