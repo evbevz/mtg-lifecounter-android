@@ -1,9 +1,12 @@
 package com.mtg.lifecounter.ui
 
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -18,22 +21,29 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
@@ -42,6 +52,8 @@ import com.mtg.lifecounter.R
 import com.mtg.lifecounter.ui.theme.CardNumbersBorderColor
 import com.mtg.lifecounter.ui.theme.CardNumbersColor
 import com.mtg.lifecounter.ui.theme.GaramondFamily
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 private const val ROWS = 5
 private const val COLS = 4
@@ -146,25 +158,70 @@ fun LifeGrid(
 
         if (isVisible) {
             val marbleSize = min(cellW, cellH) * 1.6f
-            val targetX = cellW * selectedCol + cellW / 2 - marbleSize / 2
-            val targetY = cellH * selectedRow + cellH / 2 - marbleSize / 2
+            val cellWPx = constraints.maxWidth.toFloat() / COLS
+            val cellHPx = constraints.maxHeight.toFloat() / ROWS
+            val gridWPx = constraints.maxWidth.toFloat()
+            val gridHPx = constraints.maxHeight.toFloat()
+            val target = Offset(cellWPx * (selectedCol + 0.5f), cellHPx * (selectedRow + 0.5f))
 
-            val animX by animateDpAsState(
-                targetValue = targetX,
-                animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
-                label = "marbleX"
-            )
-            val animY by animateDpAsState(
-                targetValue = targetY,
-                animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
-                label = "marbleY"
+            // Marble center in grid pixels; follows the finger while dragged, springs to a cell otherwise
+            val marbleCenter = remember { Animatable(target, Offset.VectorConverter) }
+            var dragCenter by remember { mutableStateOf<Offset?>(null) }
+            val isDragging = dragCenter != null
+            val scope = rememberCoroutineScope()
+            val currentOnLifeSelected by rememberUpdatedState(onLifeSelected)
+            val currentLifeBase by rememberUpdatedState(lifeBase)
+
+            LaunchedEffect(target, isDragging) {
+                if (!isDragging) {
+                    marbleCenter.animateTo(target, spring(dampingRatio = 0.7f, stiffness = 300f))
+                }
+            }
+
+            // Keeps the marble inside the field, as cropMarblePos in the iOS version
+            fun crop(pos: Offset) = Offset(
+                pos.x.coerceIn(cellWPx / 2f, gridWPx - cellWPx / 2f),
+                pos.y.coerceIn(cellHPx / 2.5f, gridHPx - cellHPx / 2.5f)
             )
 
             Box(
                 modifier = Modifier
-                    .offset(x = animX, y = animY)
+                    .offset {
+                        val center = dragCenter ?: marbleCenter.value
+                        val half = marbleSize.toPx() / 2f
+                        IntOffset((center.x - half).roundToInt(), (center.y - half).roundToInt())
+                    }
                     .size(marbleSize)
-                    .then(marbleModifier),
+                    .then(marbleModifier)
+                    .pointerInput(cellWPx, cellHPx) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            down.consume()
+                            var center = marbleCenter.value
+                            dragCenter = center
+
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                if (!change.pressed) {
+                                    change.consume()
+                                    break
+                                }
+                                center = crop(center + change.positionChange())
+                                dragCenter = center
+                                change.consume()
+                            }
+
+                            val col = (center.x / cellWPx).toInt().coerceIn(0, COLS - 1)
+                            val row = (center.y / cellHPx).toInt().coerceIn(0, ROWS - 1)
+                            currentOnLifeSelected(currentLifeBase + COLS * (ROWS - row) - col)
+                            val dropped = center
+                            scope.launch {
+                                marbleCenter.snapTo(dropped)
+                                dragCenter = null
+                            }
+                        }
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 Image(
