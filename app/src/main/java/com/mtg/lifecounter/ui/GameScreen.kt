@@ -59,7 +59,7 @@ private const val CARD_H = 721f / 1024f
 private const val BOTTOM_BASELINE = 0.892f
 
 private const val GRID_COLUMNS = 4
-private const val MARBLE_DISPLAY_SCALE = 0.32f
+private const val MARBLE_DISPLAY_SCALE = 0.4f
 private const val BUBBLE_DISPLAY_SCALE = 0.16f
 
 private const val DICE_SIZE_RATIO = 80f / 768f
@@ -188,11 +188,13 @@ fun GameScreen(
 
                 val marbleRes = if (shownIndex == 0) R.drawable.marble_blue else R.drawable.marble_red
                 val density = LocalDensity.current.density
+                val marbleSize = gameW * MARBLE_DISPLAY_SCALE
 
                 LifeGrid(
                     lifeBase = shownPlayer.lifeBase,
                     currentLife = shownPlayer.life,
                     marbleRes = marbleRes,
+                    marbleSize = marbleSize,
                     onLifeSelected = { viewModel.setLife(it) },
                     onLifeBaseChange = { viewModel.setLifeBase(it) },
                     modifier = Modifier
@@ -225,7 +227,6 @@ fun GameScreen(
 
                 // --- Bottom controls ---
                 val bottomY = gameH * BOTTOM_BASELINE
-                val marbleSize = gameW * MARBLE_DISPLAY_SCALE
                 val bubbleSize = gameW * BUBBLE_DISPLAY_SCALE
                 // Player marble buttons
                 for (i in 0 until 2) {

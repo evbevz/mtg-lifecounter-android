@@ -42,7 +42,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
 import com.mtg.lifecounter.R
 import com.mtg.lifecounter.ui.theme.CardNumbersBorderColor
@@ -82,6 +81,7 @@ fun LifeGrid(
     marbleRes: Int,
     onLifeSelected: (Int) -> Unit,
     onLifeBaseChange: (Int) -> Unit,
+    marbleSize: Dp,
     modifier: Modifier = Modifier,
     marbleKey: Any? = null,
     marbleModifier: Modifier = Modifier
@@ -212,8 +212,6 @@ fun LifeGrid(
         // Marble overlay on the selected life cell; always kept on the field
         val target = cellCenter(currentLife)
         run {
-            val marbleSize = min(cellW, cellH) * 1.6f
-
             // Marble center in unscrolled grid pixels; follows the finger while dragged,
             // springs to a cell otherwise. A new marbleKey places it at its cell without sliding.
             val marbleCenter = remember(marbleKey) { Animatable(target, Offset.VectorConverter) }
