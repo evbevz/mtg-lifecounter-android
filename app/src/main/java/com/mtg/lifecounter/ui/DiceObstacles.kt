@@ -9,7 +9,7 @@ import com.mtg.lifecounter.dice.DiceController
 import com.mtg.lifecounter.dice.DiceMarble
 
 /** Collision radius relative to the marble bounds, as in the iOS version. */
-private const val MARBLE_HIT_SCALE = 1.1f
+private const val MARBLE_HIT_SCALE = 0.45f
 
 /** Marbles on screen that the dice bounces off, keyed by the composable that shows them. */
 class DiceObstacles(private val dice: DiceController) {
