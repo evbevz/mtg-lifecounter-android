@@ -25,12 +25,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
@@ -39,10 +43,13 @@ import com.mtg.lifecounter.ui.theme.CardNumbersBorderColor
 import com.mtg.lifecounter.ui.theme.CardNumbersColor
 import com.mtg.lifecounter.ui.theme.GaramondFamily
 
-private const val ROWS = 10
+private const val ROWS = 5
 private const val COLS = 4
 private const val SCROLL_THRESHOLD = 200f
-private const val PAGE_SIZE = 20
+private const val PAGE_SIZE = COLS * ROWS
+
+/** Number of cell rows drawn in Field.png; only the top [ROWS] of them are shown. */
+private const val FIELD_IMAGE_ROWS = 10
 
 @Composable
 fun LifeGrid(
@@ -51,7 +58,8 @@ fun LifeGrid(
     marbleRes: Int,
     onLifeSelected: (Int) -> Unit,
     onScrollPage: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    marbleModifier: Modifier = Modifier
 ) {
     var dragAccumulator by remember { mutableFloatStateOf(0f) }
 
@@ -79,8 +87,12 @@ fun LifeGrid(
         val cellH = gridH / ROWS
 
         // Field.png background texture (brown grid with cell borders)
+        val field = ImageBitmap.imageResource(R.drawable.field)
+        val fieldPainter = remember(field) {
+            BitmapPainter(field, srcSize = IntSize(field.width, field.height * ROWS / FIELD_IMAGE_ROWS))
+        }
         Image(
-            painter = painterResource(R.drawable.field),
+            painter = fieldPainter,
             contentDescription = null,
             contentScale = ContentScale.FillBounds,
             modifier = Modifier.fillMaxSize()
@@ -133,7 +145,7 @@ fun LifeGrid(
         val isVisible = selectedRow in 0 until ROWS && selectedCol in 0 until COLS
 
         if (isVisible) {
-            val marbleSize = min(cellW, cellH) * 1.6f
+            val marbleSize = min(cellW, cellH) * 0.8f
             val targetX = cellW * selectedCol + cellW / 2 - marbleSize / 2
             val targetY = cellH * selectedRow + cellH / 2 - marbleSize / 2
 
@@ -151,7 +163,8 @@ fun LifeGrid(
             Box(
                 modifier = Modifier
                     .offset(x = animX, y = animY)
-                    .size(marbleSize),
+                    .size(marbleSize)
+                    .then(marbleModifier),
                 contentAlignment = Alignment.Center
             ) {
                 Image(

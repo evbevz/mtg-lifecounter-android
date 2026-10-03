@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -101,32 +100,23 @@ fun PoisonView(
 }
 
 /**
- * Dice button using the dice-place.png icon.
- * Tapping triggers a roll; the icon shakes during the roll animation.
+ * Dice home area using the dice-place.png icon.
+ * The 3D dice rests here; tapping the area brings the dice back.
  */
 @Composable
 fun DiceButton(
-    diceValue: Int,
-    isRolling: Boolean,
-    onRoll: () -> Unit,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var showResult by remember { mutableStateOf(false) }
-
-    if (!isRolling && showResult) {
-        // rolling just finished — keep showing result
-    }
-    if (isRolling) showResult = true
-
     Box(
         modifier = modifier.clickable(
             indication = null,
             interactionSource = remember { MutableInteractionSource() }
-        ) { onRoll() }
+        ) { onClick() }
     ) {
         Image(
             painter = painterResource(R.drawable.dice_place),
-            contentDescription = "Roll dice (current: $diceValue)",
+            contentDescription = "Return dice",
             contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize()
         )

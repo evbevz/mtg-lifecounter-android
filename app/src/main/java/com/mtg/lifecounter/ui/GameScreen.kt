@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -24,6 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -31,6 +34,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import com.mtg.lifecounter.GameViewModel
 import com.mtg.lifecounter.R
+import com.mtg.lifecounter.dice.DiceController
 import com.mtg.lifecounter.ui.theme.CardNumbersBorderColor
 import com.mtg.lifecounter.ui.theme.GaramondFamily
 import kotlinx.coroutines.delay
@@ -59,15 +63,17 @@ private const val IDLE_TIMEOUT_MS = 60_000L
 @Composable
 fun GameScreen(
     viewModel: GameViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    dice: DiceController? = null
 ) {
     val activePlayer = viewModel.activePlayer
     val activeIndex = viewModel.activePlayerIndex
+    val obstacles = remember(dice) { dice?.let(::DiceObstacles) }
 
     var lastInteraction by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var showIdleScreen by remember { mutableStateOf(false) }
 
-    LaunchedEffect(viewModel.players, viewModel.activePlayerIndex, viewModel.diceValue) {
+    LaunchedEffect(viewModel.players, viewModel.activePlayerIndex) {
         lastInteraction = System.currentTimeMillis()
         showIdleScreen = false
     }
@@ -75,6 +81,18 @@ fun GameScreen(
     LaunchedEffect(lastInteraction) {
         delay(IDLE_TIMEOUT_MS)
         showIdleScreen = true
+    }
+
+    DisposableEffect(dice) {
+        dice?.onUserInteraction = {
+            lastInteraction = System.currentTimeMillis()
+            showIdleScreen = false
+        }
+        onDispose { dice?.onUserInteraction = null }
+    }
+
+    LaunchedEffect(dice, showIdleScreen) {
+        dice?.setDiceVisible(!showIdleScreen)
     }
 
     Box(modifier = modifier.background(Color.Black)) {
@@ -96,7 +114,19 @@ fun GameScreen(
                 gameH = screenW / GAME_ASPECT
             }
 
-            Box(modifier = Modifier.size(gameW, gameH)) {
+            Box(
+                modifier = Modifier
+                    .size(gameW, gameH)
+                    .onGloballyPositioned { coordinates ->
+                        val position = coordinates.positionInRoot()
+                        dice?.setGameArea(
+                            position.x,
+                            position.y,
+                            coordinates.size.width.toFloat(),
+                            coordinates.size.height.toFloat()
+                        )
+                    }
+            ) {
                 // --- Background frame (BackGrHole.png) ---
                 Image(
                     painter = painterResource(R.drawable.backgrhole),
@@ -121,7 +151,8 @@ fun GameScreen(
                     onScrollPage = { viewModel.scrollLifeBase(it) },
                     modifier = Modifier
                         .offset(x = cardX, y = cardY)
-                        .size(width = cardW, height = cardH)
+                        .size(width = cardW, height = cardH),
+                    marbleModifier = Modifier.diceObstacle(obstacles, "active")
                 )
 
                 // --- Poison thermometer (left side) ---
@@ -166,7 +197,11 @@ fun GameScreen(
                             modifier = Modifier
                                 .offset(x = btnX, y = btnY)
                                 .size(marbleSize)
-                                .clickable { viewModel.switchPlayer(i) },
+                                .diceObstacle(obstacles, "player$i")
+                                .clickable {
+                                    dice?.returnToDefaultPlace()
+                                    viewModel.switchPlayer(i)
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             Image(
@@ -195,12 +230,17 @@ fun GameScreen(
                 val diceY = bottomY - diceSize / 2
 
                 DiceButton(
-                    diceValue = viewModel.diceValue,
-                    isRolling = viewModel.isDiceRolling,
-                    onRoll = { viewModel.rollDice() },
+                    onClick = { dice?.returnToDefaultPlace() },
                     modifier = Modifier
                         .offset(x = diceX, y = diceY)
                         .size(diceSize)
+                        .onGloballyPositioned { coordinates ->
+                            val position = coordinates.positionInRoot()
+                            dice?.setDefaultPlace(
+                                position.x + coordinates.size.width / 2f,
+                                position.y + coordinates.size.height / 2f
+                            )
+                        }
                 )
             }
         }

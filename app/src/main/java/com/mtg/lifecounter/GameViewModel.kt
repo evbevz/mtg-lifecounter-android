@@ -5,10 +5,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlin.random.Random
 
 data class PlayerData(
     val life: Int = 20,
@@ -22,12 +18,6 @@ class GameViewModel : ViewModel() {
         private set
 
     var activePlayerIndex by mutableIntStateOf(0)
-        private set
-
-    var diceValue by mutableIntStateOf(1)
-        private set
-
-    var isDiceRolling by mutableStateOf(false)
         private set
 
     val activePlayer: PlayerData
@@ -50,18 +40,6 @@ class GameViewModel : ViewModel() {
     fun switchPlayer(index: Int) {
         if (index in players.indices) {
             activePlayerIndex = index
-        }
-    }
-
-    fun rollDice() {
-        if (isDiceRolling) return
-        viewModelScope.launch {
-            isDiceRolling = true
-            repeat(12) { i ->
-                diceValue = Random.nextInt(1, 7)
-                delay(80L + i * 40L)
-            }
-            isDiceRolling = false
         }
     }
 
