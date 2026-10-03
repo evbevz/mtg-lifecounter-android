@@ -67,6 +67,9 @@ private const val DICE_RIGHT_OFFSET = 60f / 768f
 
 private const val IDLE_TIMEOUT_MS = 60_000L
 
+/** Width / height of Poison_N.png (93 × 670). */
+private const val POISON_ASPECT = 93f / 670f
+
 /** Player switch timings; the flip matches CARD_ROTATE_DURATION of the iOS version. */
 private const val MARBLE_FADE_MS = 200
 private const val CARD_FLIP_MS = 400
@@ -207,7 +210,7 @@ fun GameScreen(
 
                 // --- Poison thermometer (left side) ---
                 val poisonH = gameH * 0.52f * 1.45f
-                val poisonW = poisonH * 0.065f
+                val poisonW = poisonH * POISON_ASPECT
                 // Centered between the left screen edge and the left edge of the grid
                 val poisonX = cardX / 2 - poisonW / 2
                 val poisonY = cardY + cardH - poisonH + gameH * 0.01f

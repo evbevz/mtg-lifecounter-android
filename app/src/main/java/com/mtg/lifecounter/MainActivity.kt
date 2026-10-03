@@ -40,7 +40,13 @@ class MainActivity : ComponentActivity() {
         // The dice layer sits above the Compose content and is sized to the game area by GameScreen.
         setContentView(FrameLayout(this).apply {
             addView(composeView, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-            addView(diceView, FrameLayout.LayoutParams(0, 0))
+            addView(
+                diceView,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            )
         })
     }
 

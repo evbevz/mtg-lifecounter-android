@@ -99,6 +99,21 @@ internal class DiceRenderer(
 
     private var lastFrameNanos = 0L
     private var idle = true
+    private var surfaceWidth = 0
+    private var surfaceHeight = 0
+    private var areaLeft = 0
+    private var areaTop = 0
+    private var areaWidth = 0
+    private var areaHeight = 0
+
+    /** The dice lives in the game box; the GL surface may be the full screen. */
+    fun setGameArea(left: Float, top: Float, width: Float, height: Float) {
+        areaLeft = left.toInt()
+        areaTop = top.toInt()
+        areaWidth = width.toInt()
+        areaHeight = height.toInt()
+        applyProjection()
+    }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         program = buildProgram()
@@ -115,18 +130,36 @@ internal class DiceRenderer(
         GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, mesh.capacity(), mesh, GLES20.GL_STATIC_DRAW)
 
         GLES20.glEnable(GLES20.GL_DEPTH_TEST)
+        GLES20.glEnable(GLES20.GL_BLEND)
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
         GLES20.glClearColor(0f, 0f, 0f, 0f)
         idle = true
+        view.requestRender()
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-        GLES20.glViewport(0, 0, width, height)
+        surfaceWidth = width
+        surfaceHeight = height
+        applyProjection()
+        idle = true
+        view.requestRender()
+    }
+
+    private fun applyProjection() {
+        val width = if (areaWidth > 0) areaWidth else surfaceWidth
+        val height = if (areaHeight > 0) areaHeight else surfaceHeight
+        if (width <= 0 || height <= 0) return
+        // GL origin is bottom-left; game-area top is in view coordinates
+        val viewportY = (surfaceHeight - areaTop - height).coerceAtLeast(0)
+        GLES20.glViewport(areaLeft.coerceAtLeast(0), viewportY, width, height)
         val halfWidth = DiceEngine.PV_WIDTH / 2f
-        val halfHeight = halfWidth * height / width.coerceAtLeast(1)
+        val halfHeight = halfWidth * height / width
         Matrix.frustumM(projection, 0, -halfWidth, halfWidth, -halfHeight, halfHeight, DiceEngine.NEAR, DiceEngine.FAR)
+        engine.setViewSize(width.toFloat(), height.toFloat())
     }
 
     override fun onDrawFrame(gl: GL10?) {
+        if (surfaceWidth <= 0 || surfaceHeight <= 0) return
         val now = System.nanoTime()
         val dt = if (idle) 1f / 60f else (now - lastFrameNanos) / 1e9f
         lastFrameNanos = now

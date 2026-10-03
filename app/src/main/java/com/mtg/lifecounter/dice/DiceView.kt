@@ -7,11 +7,9 @@ import android.opengl.EGL14
 import android.opengl.GLSurfaceView
 import android.view.MotionEvent
 import android.view.View
-import android.widget.FrameLayout
 import javax.microedition.khronos.egl.EGL10
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.egl.EGLDisplay
-import kotlin.math.roundToInt
 
 /** Bridge between the Compose game screen and the dice layer. Coordinates are root pixels. */
 interface DiceController {
@@ -31,6 +29,7 @@ interface DiceController {
 class DiceView(context: Context) : GLSurfaceView(context), DiceController {
 
     private val engine = DiceEngine(resources.displayMetrics.density)
+    private val renderer = DiceRenderer(context, this, engine)
 
     private var areaLeft = 0f
     private var areaTop = 0f
@@ -44,33 +43,23 @@ class DiceView(context: Context) : GLSurfaceView(context), DiceController {
     override var onUserInteraction: (() -> Unit)? = null
 
     init {
+        setZOrderOnTop(true)
+        holder.setFormat(PixelFormat.TRANSLUCENT)
         setEGLContextClientVersion(2)
         setEGLConfigChooser(DiceConfigChooser())
-        holder.setFormat(PixelFormat.TRANSLUCENT)
-        setZOrderOnTop(true)
         preserveEGLContextOnPause = true
-        setRenderer(DiceRenderer(context, this, engine))
+        setRenderer(renderer)
         renderMode = RENDERMODE_WHEN_DIRTY
     }
 
     override fun setGameArea(left: Float, top: Float, width: Float, height: Float) {
-        val params = (layoutParams as? FrameLayout.LayoutParams) ?: FrameLayout.LayoutParams(0, 0)
-        val newWidth = width.roundToInt()
-        val newHeight = height.roundToInt()
-        val newLeft = left.roundToInt()
-        val newTop = top.roundToInt()
-        if (params.width != newWidth || params.height != newHeight ||
-            params.leftMargin != newLeft || params.topMargin != newTop
-        ) {
-            params.width = newWidth
-            params.height = newHeight
-            params.leftMargin = newLeft
-            params.topMargin = newTop
-            layoutParams = params
-        }
-        areaLeft = newLeft.toFloat()
-        areaTop = newTop.toFloat()
+        areaLeft = left
+        areaTop = top
+        // Physics and the camera stay in the game box even if the GL surface is the full screen.
+        queueEvent { renderer.setGameArea(left, top, width, height) }
+        engine.setViewSize(width, height)
         pushLayout()
+        post { requestRender() }
     }
 
     override fun setDefaultPlace(x: Float, y: Float) {
@@ -94,7 +83,6 @@ class DiceView(context: Context) : GLSurfaceView(context), DiceController {
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        engine.setViewSize(w.toFloat(), h.toFloat())
         requestRender()
     }
 
@@ -103,7 +91,7 @@ class DiceView(context: Context) : GLSurfaceView(context), DiceController {
         val time = event.eventTime / 1000.0
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                if (!engine.touchDown(event.x, event.y, time)) return false
+                if (!engine.touchDown(toGameX(event.x), toGameY(event.y), time)) return false
                 activePointerId = event.getPointerId(0)
                 lastTouchX = event.x
                 lastTouchY = event.y
@@ -114,13 +102,13 @@ class DiceView(context: Context) : GLSurfaceView(context), DiceController {
                 if (index < 0) return true
                 val x = event.getX(index)
                 val y = event.getY(index)
-                engine.touchMove(x, y, lastTouchX, lastTouchY, time)
+                engine.touchMove(toGameX(x), toGameY(y), toGameX(lastTouchX), toGameY(lastTouchY), time)
                 lastTouchX = x
                 lastTouchY = y
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
                 if (event.getPointerId(event.actionIndex) != activePointerId) return true
-                engine.touchUp(event.getX(event.actionIndex), event.getY(event.actionIndex), time)
+                engine.touchUp(toGameX(event.getX(event.actionIndex)), toGameY(event.getY(event.actionIndex)), time)
                 activePointerId = MotionEvent.INVALID_POINTER_ID
             }
             MotionEvent.ACTION_CANCEL -> {
@@ -131,6 +119,10 @@ class DiceView(context: Context) : GLSurfaceView(context), DiceController {
         requestRender()
         return true
     }
+
+    private fun toGameX(x: Float) = x - areaLeft
+
+    private fun toGameY(y: Float) = y - areaTop
 
     private fun pushLayout() {
         defaultPlace?.let { (x, y) -> engine.setDefaultPlace(x - areaLeft, y - areaTop) }
