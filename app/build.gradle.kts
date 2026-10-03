@@ -39,6 +39,16 @@ android {
     }
 }
 
+androidComponents {
+    onVariants { variant ->
+        variant.outputs.forEach { output ->
+            (output as com.android.build.api.variant.impl.VariantOutputImpl)
+                .outputFileName
+                .set("MTGLifecounter.apk")
+        }
+    }
+}
+
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.02.00"))
     implementation("androidx.core:core-ktx:1.12.0")
