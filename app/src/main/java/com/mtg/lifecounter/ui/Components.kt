@@ -2,22 +2,24 @@ package com.mtg.lifecounter.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.painterResource
 import com.mtg.lifecounter.R
 import kotlin.math.abs
+
+/** A vertical slide of 1/25 of the counter height changes poison by one, as in the iOS version. */
+private const val SLIDE_STEPS_PER_HEIGHT = 25f
 
 private val poisonResIds = intArrayOf(
     R.drawable.poison_0, R.drawable.poison_1, R.drawable.poison_2,
@@ -44,48 +46,42 @@ fun PoisonView(
     modifier: Modifier = Modifier
 ) {
     val resId = poisonResIds[value.coerceIn(0, 20)]
-    var viewHeight by remember { mutableFloatStateOf(1f) }
+    // The gesture outlives value changes, so it must not restart mid-slide
+    val currentOnValueChange by rememberUpdatedState(onValueChange)
 
     Box(
         modifier = modifier
-            .onSizeChanged { viewHeight = it.height.toFloat() }
-            .pointerInput(value) {
-                var startX = 0f
-                var startY = 0f
-                var lastStepY = 0f
-                var hasMoved = false
-                val stepThreshold = viewHeight / 25f
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    down.consume()
+                    val stepThreshold = size.height / SLIDE_STEPS_PER_HEIGHT
+                    val startX = down.position.x
+                    var lastStepY = down.position.y
+                    var hasMoved = false
 
-                awaitPointerEventScope {
                     while (true) {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        startX = down.position.x
-                        startY = down.position.y
-                        lastStepY = startY
-                        hasMoved = false
-
-                        do {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull() ?: break
-                            if (change.pressed) {
-                                val dy = change.position.y - lastStepY
-                                if (abs(dy) > stepThreshold) {
-                                    hasMoved = true
-                                    if (dy > 0) onValueChange(-1)
-                                    else onValueChange(1)
-                                    lastStepY = change.position.y
-                                }
-                                if (!hasMoved && abs(change.position.x - startX) > stepThreshold) {
-                                    hasMoved = true
-                                }
-                                change.consume()
-                            }
-                        } while (event.changes.any { it.pressed })
-
-                        if (!hasMoved) {
-                            if (startY < viewHeight / 2f) onValueChange(1)
-                            else onValueChange(-1)
+                        val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) {
+                            change.consume()
+                            break
                         }
+                        // Each step of the slide changes the value by one: up adds, down removes
+                        var dy = change.position.y - lastStepY
+                        while (abs(dy) > stepThreshold) {
+                            hasMoved = true
+                            currentOnValueChange(if (dy > 0) -1 else 1)
+                            lastStepY += if (dy > 0) stepThreshold else -stepThreshold
+                            dy = change.position.y - lastStepY
+                        }
+                        if (!hasMoved && abs(change.position.x - startX) > stepThreshold) {
+                            hasMoved = true
+                        }
+                        change.consume()
+                    }
+
+                    if (!hasMoved) {
+                        currentOnValueChange(if (down.position.y < size.height / 2f) 1 else -1)
                     }
                 }
             }

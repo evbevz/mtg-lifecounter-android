@@ -56,8 +56,6 @@ private const val CARD_Y = 108f / 1024f
 private const val CARD_W = 560f / 768f
 private const val CARD_H = 721f / 1024f
 
-private const val POISON_X = 25f / 768f
-
 private const val BOTTOM_BASELINE = 0.892f
 
 private const val GRID_COLUMNS = 4
@@ -117,6 +115,8 @@ fun GameScreen(
 
     // Player whose card is on screen; lags behind activeIndex while the switch animation runs
     var shownIndex by remember { mutableIntStateOf(activeIndex) }
+    // Poison counter switches only after the whole switch animation has finished
+    var poisonIndex by remember { mutableIntStateOf(activeIndex) }
     val shownPlayer = viewModel.players[shownIndex]
     val marblesAlpha = remember { Animatable(1f) }
     val cardRotation = remember { Animatable(0f) }
@@ -133,6 +133,7 @@ fun GameScreen(
         withFrameNanos { }
         cardRotation.animateTo(0f, tween(CARD_FLIP_MS / 2, easing = LinearEasing))
         marblesAlpha.animateTo(1f, tween(MARBLE_FADE_MS))
+        poisonIndex = activeIndex
         isSwitching = false
     }
 
@@ -205,13 +206,14 @@ fun GameScreen(
                 )
 
                 // --- Poison thermometer (left side) ---
-                val poisonX = gameW * POISON_X
-                val poisonH = gameH * 0.52f
+                val poisonH = gameH * 0.52f * 1.45f
                 val poisonW = poisonH * 0.065f
+                // Centered between the left screen edge and the left edge of the grid
+                val poisonX = cardX / 2 - poisonW / 2
                 val poisonY = cardY + cardH - poisonH + gameH * 0.01f
 
                 PoisonView(
-                    value = activePlayer.poison,
+                    value = viewModel.players[poisonIndex].poison,
                     onValueChange = { viewModel.adjustPoison(it) },
                     modifier = Modifier
                         .offset(x = poisonX, y = poisonY)
