@@ -191,7 +191,7 @@ fun GameScreen(
                     currentLife = shownPlayer.life,
                     marbleRes = marbleRes,
                     onLifeSelected = { viewModel.setLife(it) },
-                    onScrollPage = { viewModel.scrollLifeBase(it) },
+                    onLifeBaseChange = { viewModel.setLifeBase(it) },
                     modifier = Modifier
                         .offset(x = cardX, y = cardY)
                         .size(width = cardW, height = cardH)

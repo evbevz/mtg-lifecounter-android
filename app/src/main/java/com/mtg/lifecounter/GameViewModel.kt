@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import com.mtg.lifecounter.ui.MAX_LIFE_BASE
 
 data class PlayerData(
     val life: Int = 20,
@@ -33,8 +34,8 @@ class GameViewModel : ViewModel() {
         }
     }
 
-    fun scrollLifeBase(delta: Int) {
-        updateActivePlayer { it.copy(lifeBase = it.lifeBase + delta) }
+    fun setLifeBase(lifeBase: Int) {
+        updateActivePlayer { it.copy(lifeBase = lifeBase.coerceIn(0, MAX_LIFE_BASE)) }
     }
 
     fun switchPlayer(index: Int) {
