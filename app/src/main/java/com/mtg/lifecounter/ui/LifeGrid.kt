@@ -145,7 +145,7 @@ fun LifeGrid(
         val isVisible = selectedRow in 0 until ROWS && selectedCol in 0 until COLS
 
         if (isVisible) {
-            val marbleSize = min(cellW, cellH) * 0.8f
+            val marbleSize = min(cellW, cellH) * 1.6f
             val targetX = cellW * selectedCol + cellW / 2 - marbleSize / 2
             val targetY = cellH * selectedRow + cellH / 2 - marbleSize / 2
 

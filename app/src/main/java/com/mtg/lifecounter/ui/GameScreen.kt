@@ -51,9 +51,9 @@ private const val POISON_X = 25f / 768f
 
 private const val BOTTOM_BASELINE = 0.892f
 
-private const val MARBLE_AREA_LEFT = 10f / 768f
-private const val MARBLE_AREA_WIDTH_RATIO = 0.5f
-private const val MARBLE_DISPLAY_SCALE = 0.16f
+private const val GRID_COLUMNS = 4
+private const val MARBLE_DISPLAY_SCALE = 0.32f
+private const val BUBBLE_DISPLAY_SCALE = 0.16f
 
 private const val DICE_SIZE_RATIO = 80f / 768f
 private const val DICE_RIGHT_OFFSET = 60f / 768f
@@ -172,26 +172,25 @@ fun GameScreen(
                 // --- Bottom controls ---
                 val bottomY = gameH * BOTTOM_BASELINE
                 val marbleSize = gameW * MARBLE_DISPLAY_SCALE
-                val buttonsAreaLeft = gameW * MARBLE_AREA_LEFT
-                val buttonsAreaW = gameW * MARBLE_AREA_WIDTH_RATIO - buttonsAreaLeft
-
+                val bubbleSize = gameW * BUBBLE_DISPLAY_SCALE
                 // Player marble buttons
                 for (i in 0 until 2) {
-                    val centerX = buttonsAreaLeft + buttonsAreaW / 2f * (2f * i + 1f)
+                    // Slots sit under grid columns 1 and 2
+                    val centerX = cardX + cardW / GRID_COLUMNS * (i + 0.5f)
                     val btnX = centerX - marbleSize / 2
                     val btnY = bottomY - marbleSize / 2
 
-                    if (i == activeIndex) {
-                        // Active player: show bubble (marble is on the grid)
-                        Image(
-                            painter = painterResource(R.drawable.bubble),
-                            contentDescription = "Player ${i + 1} slot",
-                            contentScale = ContentScale.FillBounds,
-                            modifier = Modifier
-                                .offset(x = btnX, y = btnY)
-                                .size(marbleSize)
-                        )
-                    } else {
+                    // Marble place bubble stays visible under the slot
+                    Image(
+                        painter = painterResource(R.drawable.bubble),
+                        contentDescription = "Player ${i + 1} slot",
+                        contentScale = ContentScale.FillBounds,
+                        modifier = Modifier
+                            .offset(x = centerX - bubbleSize / 2, y = bottomY - bubbleSize / 2)
+                            .size(bubbleSize)
+                    )
+
+                    if (i != activeIndex) {
                         // Inactive player: show marble button with life total
                         Box(
                             modifier = Modifier
