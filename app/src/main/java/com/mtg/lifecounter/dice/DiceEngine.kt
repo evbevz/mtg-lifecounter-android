@@ -436,7 +436,7 @@ class DiceEngine(private val pixelsPerPoint: Float) {
         const val FAR = 60f
         const val PV_WIDTH = 10f
         const val SHIFT_Z = 57f
-        const val SCALE_FACTOR = 2.5f
+        const val SCALE_FACTOR = 2.2f
 
         private const val ACCELERATION = -10f
         private const val MAX_ROLL_DURATION = 3.0
