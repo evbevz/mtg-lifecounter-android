@@ -106,7 +106,6 @@ fun LifeGrid(
             mutableFloatStateOf((lifeBase / COLS * cellHPx).coerceIn(0f, maxScrollPx))
         }
         var settleJob by remember { mutableStateOf<Job?>(null) }
-        var isScrolling by remember { mutableStateOf(false) }
 
         /** Center of the cell with [life] in unscrolled grid pixels. */
         fun cellCenter(life: Int): Offset {
@@ -129,7 +128,6 @@ fun LifeGrid(
         )
 
         fun settle() {
-            isScrolling = false
             val rows = (scrollPx / cellHPx).roundToInt().coerceIn(0, MAX_LIFE_BASE / COLS)
             currentOnLifeBaseChange(rows * COLS)
             settleJob = scope.launch {
@@ -154,7 +152,6 @@ fun LifeGrid(
                     detectVerticalDragGestures(
                         onDragStart = {
                             settleJob?.cancel()
-                            isScrolling = true
                         },
                         onDragEnd = { settle() },
                         onDragCancel = { settle() },
@@ -218,10 +215,9 @@ fun LifeGrid(
             var dragCenter by remember(marbleKey) { mutableStateOf<Offset?>(null) }
             val isDragging = dragCenter != null
 
-            LaunchedEffect(marbleCenter, target, isDragging, isScrolling) {
+            LaunchedEffect(marbleCenter, target, isDragging) {
                 if (isDragging) return@LaunchedEffect
-                if (isScrolling) marbleCenter.snapTo(target)
-                else marbleCenter.animateTo(target, spring(dampingRatio = 0.7f, stiffness = 300f))
+                marbleCenter.animateTo(target, spring(dampingRatio = 0.7f, stiffness = 300f))
             }
 
             Box(
