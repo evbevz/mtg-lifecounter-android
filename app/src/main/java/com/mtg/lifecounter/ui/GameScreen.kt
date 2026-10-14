@@ -62,7 +62,7 @@ private const val CARD_H = 721f / 1024f
 private const val BOTTOM_BASELINE = 0.892f
 
 private const val GRID_COLUMNS = 4
-private const val MARBLE_DISPLAY_SCALE = 0.4f
+private const val MARBLE_DISPLAY_SCALE = 0.45f
 private const val BUBBLE_DISPLAY_SCALE = 0.16f
 
 private const val DICE_SIZE_RATIO = 80f / 768f
@@ -276,7 +276,7 @@ fun GameScreen(
                                 text = "${viewModel.players[i].life}",
                                 fontFamily = GaramondFamily,
                                 fontWeight = FontWeight.SemiBold,
-                                fontSize = (marbleSize.value * 0.35f).sp,
+                                fontSize = (marbleSize.value * 0.3f).sp,
                                 color = CardNumbersBorderColor.copy(alpha = 0.5f),
                                 textAlign = TextAlign.Center
                             )
